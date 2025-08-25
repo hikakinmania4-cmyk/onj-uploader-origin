@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>画像アップローダー (imgbb)</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 1rem auto; padding: 0 1rem; background-color: #f4f4f9; color: #333; }
+    h1 { text-align: center; color: #4a4a4a; }
+    #dropzone { border: 3px dashed #d0d0e0; border-radius: 15px; padding: 40px 20px; text-align: center; cursor: pointer; transition: background-color 0.2s, border-color 0.2s; background-color: #fff; }
+    #preview { display: none; max-width: 100%; max-height: 400px; margin: 1.5rem auto; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+    #uploadButton { display: none; width: 100%; padding: 1rem; font-size: 1.1rem; font-weight: bold; color: #fff; background-color: #007bff; border: none; border-radius: 8px; cursor: pointer; margin-top: 1rem; transition: background-color 0.2s; }
+    #uploadButton:disabled { background-color: #9acaff; cursor: not-allowed; }
+    #status { margin-top: 1rem; text-align: center; font-weight: bold; }
+    #result { margin-top: 1rem; padding: 1rem; background-color: #fff; border-radius: 8px; word-wrap: break-word; display: none; }
+    #result img { max-width: 100%; margin-top: 0.5rem; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>画像アップローダー (imgbb)</h1>
+  <input type="file" id="imageInput" accept="image/png, image/jpeg, image/gif" hidden>
+  <div id="dropzone"><p>タップして画像を選択</p></div>
+  <img id="preview" src="#" alt="プレビュー画像">
+  <button id="uploadButton" disabled>アップロード</button>
+  <div id="status"></div>
+  <div id="result"></div>
+  <script>
+    const dropzone = document.getElementById('dropzone');
+    const imageInput = document.getElementById('imageInput');
+    const preview = document.getElementById('preview');
+    const uploadButton = document.getElementById('uploadButton');
+    const statusDiv = document.getElementById('status');
+    const resultDiv = document.getElementById('result');
+
+    const BACKEND_URL = 'http://localhost:3000/api/upload';
+    let selectedFile = null;
+
+    dropzone.addEventListener('click', () => imageInput.click());
+    imageInput.addEventListener('change', (event) => {
+      const file = event.target.files[0];
+      if (file) { handleFile(file); }
+    });
+    uploadButton.addEventListener('click', () => {
+      if (selectedFile) { uploadImage(selectedFile); }
+    });
+
+    function handleFile(file) {
+      selectedFile = file;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        preview.src = e.target.result;
+        preview.style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+      uploadButton.style.display = 'block';
+      uploadButton.disabled = false;
+      statusDiv.textContent = '準備完了！アップロードボタンを押してください。';
+      resultDiv.style.display = 'none';
+    }
+
+    async function uploadImage(file) {
+      uploadButton.disabled = true;
+      uploadButton.textContent = 'アップロード中...';
+      statusDiv.textContent = '⏳ 画像をimgbbに送信中...';
+      resultDiv.style.display = 'none';
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const response = await fetch(BACKEND_URL, {
+          method: 'POST',
+          body: formData,
+        });
+        
+        const result = await response.json();
+
+        if (result.success) {
+          statusDiv.textContent = '✅ アップロード成功！';
+          const imageUrl = result.data.url; // オリジナルの画像URLを取得
+          resultDiv.innerHTML = `<p><strong>画像URL:</strong></p><input type="text" value="${imageUrl}" readonly onclick="this.select();"><img src="${imageUrl}" alt="アップロードされた画像">`;
+          resultDiv.style.display = 'block';
+          uploadButton.textContent = '別の画像をアップロード';
+        } else {
+          throw new Error(result.message || '不明なエラー');
+        }
+      } catch (error) {
+        console.error('アップロード処理中にエラー:', error);
+        statusDiv.textContent = `❌ エラー: ${error.message}`;
+      } finally {
+        uploadButton.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>
